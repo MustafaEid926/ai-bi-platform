@@ -12,13 +12,15 @@ import { logger } from '@aibi/logger';
 import { publish, connectBus } from '@aibi/messaging';
 import { requestContext } from '@aibi/observability';
 
-import {
-  S3Client,
-  PutObjectCommand,
-  HeadObjectCommand,
-} from '@aws-sdk/client-s3';
+// import {
+//   S3Client,
+//   PutObjectCommand,
+//   HeadObjectCommand,
+// } from '@aws-sdk/client-s3';
 
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { MinioStorage } from './storage/minio.js';
+
+// import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3002);
@@ -33,15 +35,17 @@ const pool = new Pool({
   password: env.postgres.password,
 });
 
-const s3 = new S3Client({
-  endpoint: `http://${env.minio.endpoint}:${env.minio.port}`,
-  region: 'us-east-1',
-  forcePathStyle: true,
-  credentials: {
-    accessKeyId: env.minio.accessKey,
-    secretAccessKey: env.minio.secretKey,
-  },
-});
+// const s3 = new S3Client({
+//   endpoint: `http://${env.minio.endpoint}:${env.minio.port}`,
+//   region: 'us-east-1',
+//   forcePathStyle: true,
+//   credentials: {
+//     accessKeyId: env.minio.accessKey,
+//     secretAccessKey: env.minio.secretKey,
+//   },
+// });
+
+const storage = new MinioStorage();
 
 type AppRequest = Request & {
   organizationId?: string;
@@ -771,6 +775,101 @@ app.get(
 );
 
 /* =========================================================
+   CREATE UPLOAD URL
+   ========================================================= */
+
+const uploadUrlSchema = z.object({
+  content_type: z
+    .string()
+    .trim()
+    .max(200)
+    .optional(),
+});
+
+app.post(
+  '/api/v1/datasets/:id/versions/:versionId/upload-url',
+  async (req: AppRequest, res, next) => {
+    try {
+      const organizationId = getOrganizationId(req);
+
+      const body = uploadUrlSchema.parse(req.body);
+
+      const result = await pool.query(
+        `
+        SELECT
+          id,
+          dataset_id,
+          version_number,
+          status,
+          original_filename,
+          object_key,
+          content_type
+        FROM dataset_versions
+        WHERE id = $1
+          AND dataset_id = $2
+          AND organization_id = $3
+        `,
+        [
+          req.params.versionId,
+          req.params.id,
+          organizationId,
+        ],
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({
+          error: {
+            code: 'DATASET_VERSION_NOT_FOUND',
+            message: 'Dataset version not found',
+            request_id:
+              req.header('X-Request-ID') ?? randomUUID(),
+          },
+        });
+      }
+
+      const version = result.rows[0];
+
+      if (
+        version.status !== 'UPLOADING' &&
+        version.status !== 'CREATED'
+      ) {
+        return res.status(409).json({
+          error: {
+            code: 'INVALID_VERSION_STATE',
+            message:
+              `Upload URL cannot be created from state ${version.status}`,
+            request_id:
+              req.header('X-Request-ID') ?? randomUUID(),
+          },
+        });
+      }
+
+      const contentType =
+        body.content_type ??
+        version.content_type ??
+        'application/octet-stream';
+
+      const uploadUrl = await storage.createUploadUrl(
+        version.object_key,
+        contentType,
+      );
+
+      return res.json({
+        data: {
+          upload_url: uploadUrl,
+          object_key: version.object_key,
+          method: 'PUT',
+          content_type: contentType,
+          expires_in: 900,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/* =========================================================
    COMPLETE UPLOAD
    ========================================================= */
 
@@ -834,6 +933,43 @@ app.post(
       }
 
       const version = versionResult.rows[0];
+
+try {
+  const object = await storage.headObject(
+    version.object_key,
+  );
+
+  logger.info(
+    {
+      dataset_version_id: version.id,
+      object_key: version.object_key,
+      content_length: object.ContentLength,
+      content_type: object.ContentType,
+    },
+    'Uploaded object verified',
+  );
+} catch (error) {
+  await client.query('ROLLBACK');
+
+  logger.warn(
+    {
+      error,
+      dataset_version_id: version.id,
+      object_key: version.object_key,
+    },
+    'Uploaded object not found in MinIO',
+  );
+
+  return res.status(409).json({
+    error: {
+      code: 'OBJECT_NOT_FOUND',
+      message:
+        'Uploaded file was not found in object storage',
+      request_id:
+        req.header('X-Request-ID') ?? randomUUID(),
+          },
+        });
+      }
 
       if (
         version.status !== 'UPLOADING' &&

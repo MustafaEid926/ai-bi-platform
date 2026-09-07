@@ -1,9 +1,9 @@
 import {
-  S3Client,
-  HeadBucketCommand,
   CreateBucketCommand,
-  PutObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -46,6 +46,7 @@ export class MinioStorage {
   async createUploadUrl(
     objectKey: string,
     contentType: string,
+    expiresIn = 900,
   ): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
@@ -54,7 +55,7 @@ export class MinioStorage {
     });
 
     return getSignedUrl(this.client, command, {
-      expiresIn: 15 * 60,
+      expiresIn,
     });
   }
 
@@ -65,5 +66,15 @@ export class MinioStorage {
         Key: objectKey,
       }),
     );
+  }
+
+  async objectExists(objectKey: string): Promise<boolean> {
+    try {
+      await this.headObject(objectKey);
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
