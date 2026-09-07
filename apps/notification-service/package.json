@@ -1,0 +1,27 @@
+{
+  "name": "@aibi/notification-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "zod": "^4.1.5",
+    "@aibi/config": "workspace:*",
+    "@aibi/errors": "workspace:*",
+    "@aibi/http": "workspace:*",
+    "@aibi/logger": "workspace:*",
+    "@aibi/messaging": "workspace:*",
+    "@aibi/observability": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.2",
+    "@types/node": "^24.3.0",
+    "@types/express": "^5.0.3"
+  }
+}

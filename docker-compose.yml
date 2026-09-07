@@ -1,0 +1,142 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment: {POSTGRES_DB: aibi, POSTGRES_USER: aibi, POSTGRES_PASSWORD: aibi}
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aibi -d aibi"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment: {RABBITMQ_DEFAULT_USER: aibi, RABBITMQ_DEFAULT_PASS: aibi}
+    ports: ["5672:5672", "15672:15672"]
+
+  redis:
+    image: redis:8-alpine
+    ports: ["6379:6379"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment: {MINIO_ROOT_USER: minioadmin, MINIO_ROOT_PASSWORD: minioadmin}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniodata:/data]
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports: ["6333:6333"]
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    environment:
+      NODE_ENV: development
+    ports: ["3000:3000"]
+    depends_on:
+      - identity-service
+      - data-service
+      - analytics-service
+      - ai-service
+      - rag-service
+      - ml-service
+      - reporting-service
+      - notification-service
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: apps/identity-service/Dockerfile
+    environment:
+      NODE_ENV: development
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: aibi
+      POSTGRES_USER: aibi
+      POSTGRES_PASSWORD: aibi
+      RABBITMQ_URL: amqp://aibi:aibi@rabbitmq:5672
+      JWT_SECRET: change-me
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  data-service:
+    build:
+      context: .
+      dockerfile: apps/data-service/Dockerfile
+    environment:
+      NODE_ENV: development
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: aibi
+      POSTGRES_USER: aibi
+      POSTGRES_PASSWORD: aibi
+      RABBITMQ_URL: amqp://aibi:aibi@rabbitmq:5672
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      minio:
+        condition: service_started
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: apps/analytics-service/Dockerfile
+    environment:
+      RABBITMQ_URL: amqp://aibi:aibi@rabbitmq:5672
+    depends_on:
+      - rabbitmq
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: apps/ai-service/Dockerfile
+    environment:
+      LLM_BASE_URL: ""
+      LLM_MODEL: open-source-model
+    depends_on:
+      - analytics-service
+      - rag-service
+      - ml-service
+
+  rag-service:
+    build:
+      context: .
+      dockerfile: apps/rag-service/Dockerfile
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    depends_on:
+      - qdrant
+
+  ml-service:
+    build:
+      context: .
+      dockerfile: apps/ml-service/Dockerfile
+
+  reporting-service:
+    build:
+      context: .
+      dockerfile: apps/reporting-service/Dockerfile
+    depends_on:
+      - rabbitmq
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: apps/notification-service/Dockerfile
+    depends_on:
+      - rabbitmq
+
+volumes:
+  pgdata: {}
+  miniodata: {}

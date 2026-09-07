@@ -1,0 +1,1 @@
+{"dataset_id":"dataset_123","version_id":"version_1","dimensions":["product"],"measures":[{"field":"revenue","aggregation":"SUM","alias":"total_revenue"}],"filters":[{"field":"region","operator":"EQUALS","value":"Cairo"}],"sort":[{"field":"total_revenue","direction":"DESC"}],"limit":10}

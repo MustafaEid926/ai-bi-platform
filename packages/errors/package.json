@@ -1,0 +1,27 @@
+{
+    "name":  "@aibi/errors",
+    "private":  true,
+    "type":  "module",
+    "scripts":  {
+                    "dev":  "tsx watch src/server.ts",
+                    "build":  "tsc -p tsconfig.json",
+                    "start":  "node dist/index.js",
+                    "test":  "node --test"
+                },
+    "dependencies":  {
+
+                     },
+    "devDependencies":  {
+                            "tsx":  "^4.19.0",
+                            "typescript":  "^5.9.2",
+                            "@types/node":  "^24.3.0"
+                        },
+    "main":  "./dist/index.js",
+    "types":  "./dist/index.d.ts",
+    "exports":  {
+                    ".":  {
+                              "types":  "./dist/index.d.ts",
+                              "import":  "./dist/index.js"
+                          }
+                }
+}
