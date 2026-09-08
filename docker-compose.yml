@@ -70,16 +70,28 @@ services:
     build:
       context: .
       dockerfile: apps/data-service/Dockerfile
+
     environment:
       NODE_ENV: development
+
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: aibi
       POSTGRES_USER: aibi
       POSTGRES_PASSWORD: aibi
+
       RABBITMQ_URL: amqp://aibi:aibi@rabbitmq:5672
+
+      MINIO_ENDPOINT: minio
+      MINIO_PUBLIC_ENDPOINT: localhost
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: business-data
+
     ports:
       - "3002:3002"
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,6 +106,8 @@ services:
       dockerfile: apps/analytics-service/Dockerfile
     environment:
       RABBITMQ_URL: amqp://aibi:aibi@rabbitmq:5672
+      DATA_SERVICE_URL: http://data-service:3002
+      
     depends_on:
       - rabbitmq
 

@@ -8,9 +8,15 @@ importers:
 
   .:
     devDependencies:
+      '@types/node':
+        specifier: ^26.5.0
+        version: 26.5.0
       prettier:
         specifier: ^3.6.2
         version: 3.9.6
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -75,6 +81,12 @@ importers:
       '@aibi/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@aws-sdk/client-s3':
+        specifier: ^3.1127.0
+        version: 3.1127.0
+      csv-parse:
+        specifier: ^7.0.2
+        version: 7.0.2
       express:
         specifier: ^5.1.0
         version: 5.2.1
@@ -402,7 +414,7 @@ importers:
   packages/config:
     devDependencies:
       '@types/node':
-        specifier: ^24.3.0
+        specifier: ^24.13.3
         version: 24.13.3
       tsx:
         specifier: ^4.19.0
@@ -798,6 +810,9 @@ packages:
   '@types/node@24.13.3':
     resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
 
+  '@types/node@26.5.0':
+    resolution: {integrity: sha512-dVSGpriSoCgz8WnDNTuSSuSv1PC/ALXihO4ulRZt7Md8k9mlbdin3lGOcDE8SnWOgf513ByWlXd7BK4azmyg/A==}
+
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
 
@@ -873,6 +888,9 @@ packages:
   cookie@0.7.2:
     resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
     engines: {node: '>= 0.6'}
+
+  csv-parse@7.0.2:
+    resolution: {integrity: sha512-uKZghv9UmPkMVLYy//KZ9HFAIJsl7wkhoEdIL0+rhuSY9pZQlhaeGEDPIe+/w7eh81MOql8Q/9+inAGWG6ZHYA==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -1256,6 +1274,9 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
+
   unpipe@1.0.0:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
@@ -1609,6 +1630,10 @@ snapshots:
     dependencies:
       undici-types: 7.18.2
 
+  '@types/node@26.5.0':
+    dependencies:
+      undici-types: 8.9.0
+
   '@types/pg@8.23.1':
     dependencies:
       '@types/node': 24.13.3
@@ -1687,6 +1712,8 @@ snapshots:
   cookie-signature@1.2.2: {}
 
   cookie@0.7.2: {}
+
+  csv-parse@7.0.2: {}
 
   debug@4.4.3:
     dependencies:
@@ -2122,6 +2149,8 @@ snapshots:
   typescript@5.9.3: {}
 
   undici-types@7.18.2: {}
+
+  undici-types@8.9.0: {}
 
   unpipe@1.0.0: {}
 

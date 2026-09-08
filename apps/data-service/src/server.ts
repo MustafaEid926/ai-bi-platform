@@ -889,6 +889,7 @@ app.post(
  * this endpoint
  */
 
+
 app.post(
   '/api/v1/datasets/:id/versions/:versionId/complete',
   async (req: AppRequest, res, next) => {
@@ -905,7 +906,10 @@ app.post(
           id,
           dataset_id,
           version_number,
-          status
+          status,
+          object_key,
+          original_filename,
+          content_type
         FROM dataset_versions
         WHERE id = $1
           AND dataset_id = $2
@@ -934,43 +938,6 @@ app.post(
 
       const version = versionResult.rows[0];
 
-try {
-  const object = await storage.headObject(
-    version.object_key,
-  );
-
-  logger.info(
-    {
-      dataset_version_id: version.id,
-      object_key: version.object_key,
-      content_length: object.ContentLength,
-      content_type: object.ContentType,
-    },
-    'Uploaded object verified',
-  );
-} catch (error) {
-  await client.query('ROLLBACK');
-
-  logger.warn(
-    {
-      error,
-      dataset_version_id: version.id,
-      object_key: version.object_key,
-    },
-    'Uploaded object not found in MinIO',
-  );
-
-  return res.status(409).json({
-    error: {
-      code: 'OBJECT_NOT_FOUND',
-      message:
-        'Uploaded file was not found in object storage',
-      request_id:
-        req.header('X-Request-ID') ?? randomUUID(),
-          },
-        });
-      }
-
       if (
         version.status !== 'UPLOADING' &&
         version.status !== 'CREATED'
@@ -988,17 +955,66 @@ try {
         });
       }
 
+      let object;
+
+      try {
+        object = await storage.headObject(
+          version.object_key,
+        );
+
+        logger.info(
+          {
+            dataset_version_id: version.id,
+            object_key: version.object_key,
+            content_length: object.ContentLength,
+            content_type: object.ContentType,
+            etag: object.ETag,
+          },
+          'Uploaded object verified',
+        );
+      } catch (error) {
+        await client.query('ROLLBACK');
+
+        logger.warn(
+          {
+            error,
+            dataset_version_id: version.id,
+            object_key: version.object_key,
+          },
+          'Failed to verify uploaded object in MinIO',
+        );
+
+        return res.status(409).json({
+          error: {
+            code: 'OBJECT_NOT_FOUND',
+            message:
+              'Uploaded file was not found in object storage',
+            request_id:
+              req.header('X-Request-ID') ?? randomUUID(),
+          },
+        });
+      }
+
       const updatedVersionResult = await client.query(
         `
         UPDATE dataset_versions
         SET
           status = 'UPLOADED',
+          file_size_bytes = $3,
+          content_type = COALESCE($4, content_type),
+          checksum = $5,
           updated_at = NOW()
         WHERE id = $1
           AND organization_id = $2
         RETURNING *
         `,
-        [req.params.versionId, organizationId],
+        [
+          req.params.versionId,
+          organizationId,
+          object.ContentLength ?? null,
+          object.ContentType ?? null,
+          object.ETag?.replace(/"/g, '') ?? null,
+        ],
       );
 
       await client.query(
@@ -1010,7 +1026,10 @@ try {
         WHERE id = $1
           AND organization_id = $2
         `,
-        [req.params.id, organizationId],
+        [
+          req.params.id,
+          organizationId,
+        ],
       );
 
       await client.query('COMMIT');
@@ -1057,6 +1076,7 @@ try {
     }
   },
 );
+
 
 /* =========================================================
    PROCESSING JOB

@@ -11,13 +11,26 @@ import { env } from '@aibi/config';
 
 export class MinioStorage {
   private readonly client: S3Client;
+  private readonly presignClient: S3Client;
   private readonly bucket: string;
 
   constructor() {
     this.bucket = env.minio.bucket;
 
+    // Used by the data-service inside Docker.
     this.client = new S3Client({
       endpoint: `http://${env.minio.endpoint}:${env.minio.port}`,
+      region: 'us-east-1',
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId: env.minio.accessKey,
+        secretAccessKey: env.minio.secretKey,
+      },
+    });
+
+    // Used only to generate URLs accessible by the client/browser.
+    this.presignClient = new S3Client({
+      endpoint: `http://${env.minio.publicEndpoint}:${env.minio.port}`,
       region: 'us-east-1',
       forcePathStyle: true,
       credentials: {
@@ -54,7 +67,7 @@ export class MinioStorage {
       ContentType: contentType,
     });
 
-    return getSignedUrl(this.client, command, {
+    return getSignedUrl(this.presignClient, command, {
       expiresIn,
     });
   }
