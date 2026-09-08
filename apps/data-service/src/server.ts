@@ -1,4 +1,4 @@
-import express, {
+import {
   type NextFunction,
   type Request,
   type Response,
@@ -12,6 +12,8 @@ import { logger } from '@aibi/logger';
 import { publish, connectBus } from '@aibi/messaging';
 import { requestContext } from '@aibi/observability';
 
+import { app } from './app.js';
+
 // import {
 //   S3Client,
 //   PutObjectCommand,
@@ -22,10 +24,7 @@ import { MinioStorage } from './storage/minio.js';
 
 // import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-const app = express();
 const port = Number(process.env.PORT ?? 3002);
-
-app.use(express.json({ limit: '2mb' }));
 
 const pool = new Pool({
   host: env.postgres.host,
