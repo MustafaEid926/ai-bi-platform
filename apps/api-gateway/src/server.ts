@@ -5,6 +5,7 @@ import { errorHandler } from '@aibi/http';
 import { requestContext } from '@aibi/observability';
 import { logger } from '@aibi/logger';
 import { connectBus } from '@aibi/messaging';
+import { gatewayConfig } from './config.js';
 
 const app = express();
 
@@ -29,15 +30,16 @@ app.get('/ready', (req, res) =>
   }),
 );
 
-const targets: any = {
-  'identity-service': 'http://identity-service:3001',
-  'data-service': 'http://data-service:3002',
-  'analytics-service': 'http://localhost:3003',
-  'ai-service': 'http://ai-service:3004',
-  'rag-service': 'http://rag-service:3005',
-  'ml-service': 'http://ml-service:3006',
-  'reporting-service': 'http://reporting-service:3007',
-  'notification-service': 'http://notification-service:3008',
+const targets: Record<string, string> = {
+  'identity-service': gatewayConfig.services.identity,
+  'data-service': gatewayConfig.services.data,
+  'analytics-service': gatewayConfig.services.analytics,
+  'ai-service': gatewayConfig.services.ai,
+  'rag-service': gatewayConfig.services.rag,
+  'ml-service': gatewayConfig.services.ml,
+  'reporting-service': gatewayConfig.services.reporting,
+  'notification-service':
+    gatewayConfig.services.notification,
 };
 
 app.use('/api/v1', async (req, res, next) => {

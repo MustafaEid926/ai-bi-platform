@@ -20,7 +20,7 @@ export class DatasetVersionService {
         organizationId,
       );
 
-    if (version.status !== 'UPLOADED') {
+    if (version.status !== 'READY') {
       throw new Error(
         `Dataset version ${versionId} is not ready for analytics`,
       );

@@ -36,6 +36,15 @@ services:
       dockerfile: apps/api-gateway/Dockerfile
     environment:
       NODE_ENV: development
+      IDENTITY_SERVICE_URL: http://identity-service:3001
+      DATA_SERVICE_URL: http://data-service:3002
+      ANALYTICS_SERVICE_URL: http://analytics-service:3003
+      AI_SERVICE_URL: http://ai-service:3004
+      RAG_SERVICE_URL: http://rag-service:3005
+      ML_SERVICE_URL: http://ml-service:3006
+      REPORTING_SERVICE_URL: http://reporting-service:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service:3008
+      
     ports: ["3000:3000"]
     depends_on:
       - identity-service
@@ -107,7 +116,9 @@ services:
     environment:
       RABBITMQ_URL: amqp://aibi:aibi@rabbitmq:5672
       DATA_SERVICE_URL: http://data-service:3002
-      
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+
     depends_on:
       - rabbitmq
 
@@ -116,7 +127,7 @@ services:
       context: .
       dockerfile: apps/ai-service/Dockerfile
     environment:
-      LLM_BASE_URL: ""
+      LLM_BASE_URL: "https://goatskin-attempt-catcall.ngrok-free.dev"
       LLM_MODEL: open-source-model
     depends_on:
       - analytics-service

@@ -170,6 +170,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1127.0
         version: 3.1127.0
+      csv-parse:
+        specifier: ^7.0.2
+        version: 7.0.2
       express:
         specifier: ^5.1.0
         version: 5.2.1

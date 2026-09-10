@@ -1,5 +1,6 @@
 import {
   CreateBucketCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -17,7 +18,6 @@ export class MinioStorage {
   constructor() {
     this.bucket = env.minio.bucket;
 
-    // Used by the data-service inside Docker.
     this.client = new S3Client({
       endpoint: `http://${env.minio.endpoint}:${env.minio.port}`,
       region: 'us-east-1',
@@ -28,7 +28,6 @@ export class MinioStorage {
       },
     });
 
-    // Used only to generate URLs accessible by the client/browser.
     this.presignClient = new S3Client({
       endpoint: `http://${env.minio.publicEndpoint}:${env.minio.port}`,
       region: 'us-east-1',
@@ -84,10 +83,28 @@ export class MinioStorage {
   async objectExists(objectKey: string): Promise<boolean> {
     try {
       await this.headObject(objectKey);
-
       return true;
     } catch {
       return false;
     }
+  }
+
+  async readObject(objectKey: string): Promise<Buffer> {
+    const response = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+      }),
+    );
+
+    if (!response.Body) {
+      throw new Error(
+        `Object body is empty for key: ${objectKey}`,
+      );
+    }
+
+    return Buffer.from(
+      await response.Body.transformToByteArray(),
+    );
   }
 }

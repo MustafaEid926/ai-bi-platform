@@ -9,7 +9,11 @@ import { z } from 'zod';
 
 import { env } from '@aibi/config';
 import { logger } from '@aibi/logger';
-import { publish, connectBus } from '@aibi/messaging';
+import {
+  publish,
+  connectBus,
+  subscribe,
+} from '@aibi/messaging';
 import { requestContext } from '@aibi/observability';
 
 import { app } from './app.js';
@@ -21,8 +25,8 @@ import { app } from './app.js';
 // } from '@aws-sdk/client-s3';
 
 import { MinioStorage } from './storage/minio.js';
-
 // import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { validateCsv } from './validators/csv.validator.js';
 
 const port = Number(process.env.PORT ?? 3002);
 
@@ -1377,6 +1381,181 @@ async function start(): Promise<void> {
     await connectBus();
 
     logger.info('RabbitMQ connected');
+    await subscribe(
+      'data-service.processing',
+      ['dataset.processing.requested'],
+      async (event) => {
+        logger.info(
+          { event },
+          'Received dataset processing event',
+        );
+
+        const data = event as {
+          event_type?: string;
+          organization_id?: string;
+          payload?: {
+            job_id?: string;
+            dataset_id?: string;
+            dataset_version_id?: string;
+            job_type?: string;
+          };
+        };
+
+        if (data.event_type !== 'dataset.processing.requested') {
+          return;
+        }
+
+        const jobId = data.payload?.job_id;
+        const versionId = data.payload?.dataset_version_id;
+
+        if (!jobId || !versionId) {
+          throw new Error(
+            'Invalid dataset processing event: missing job_id or dataset_version_id',
+          );
+        }
+
+        const result = await pool.query(
+          `
+        SELECT
+          id,
+          object_key,
+          status,
+          organization_id
+        FROM dataset_versions
+        WHERE id = $1
+          AND organization_id = $2
+        LIMIT 1
+      `,
+          [
+            versionId,
+            data.organization_id,
+          ],
+        );
+
+        if (result.rows.length === 0) {
+          throw new Error(
+            `Dataset version not found: ${versionId}`,
+          );
+        }
+
+        const version = result.rows[0];
+
+        const buffer = await storage.readObject(
+          version.object_key,
+        );
+
+        const validation = validateCsv(buffer);
+
+        if (!validation.valid) {
+          await pool.query(
+            `
+          UPDATE processing_jobs
+          SET
+            status = 'FAILED',
+            error_message = $2,
+            completed_at = NOW()
+          WHERE id = $1
+        `,
+            [jobId, validation.error ?? 'CSV validation failed'],
+          );
+
+          await pool.query(
+            `
+          UPDATE dataset_versions
+          SET status = 'FAILED',
+              updated_at = NOW()
+          WHERE id = $1
+        `,
+            [versionId],
+          );
+
+          logger.error(
+            {
+              jobId,
+              versionId,
+              error: validation.error,
+            },
+            'Dataset validation failed',
+          );
+
+          return;
+        }
+
+        await pool.query(
+          `
+        UPDATE processing_jobs
+        SET
+          status = 'SUCCEEDED',
+          completed_at = NOW()
+        WHERE id = $1
+      `,
+          [jobId],
+        );
+
+        await pool.query(
+          `
+        UPDATE dataset_versions
+        SET
+          status = 'READY',
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+          [versionId],
+        );
+
+        logger.info(
+          {
+            jobId,
+            versionId,
+            rowCount: validation.rowCount,
+            columnCount: validation.columnCount,
+            columns: validation.columns,
+          },
+          'Dataset validation completed successfully',
+        );
+      });
+        const queuedJobs = await pool.query(
+      `
+      SELECT
+        pj.id AS job_id,
+        pj.organization_id,
+        pj.job_type,
+        dv.dataset_id,
+        dv.id AS dataset_version_id
+      FROM processing_jobs pj
+      INNER JOIN dataset_versions dv
+        ON dv.id = pj.dataset_version_id
+      WHERE pj.status = 'QUEUED'
+        AND dv.status = 'PROCESSING'
+      ORDER BY pj.created_at ASC
+      `,
+    );
+
+    for (const job of queuedJobs.rows) {
+      await publish(
+        'dataset.processing.requested',
+        {
+          job_id: job.job_id,
+          dataset_id: job.dataset_id,
+          dataset_version_id: job.dataset_version_id,
+          job_type: job.job_type,
+        },
+        {
+          producer: 'data-service',
+          organization_id: job.organization_id,
+          correlation_id: randomUUID(),
+        },
+      );
+
+      logger.info(
+        {
+          jobId: job.job_id,
+          versionId: job.dataset_version_id,
+        },
+        'Requeued pending dataset processing job',
+      );
+    }
+    logger.info('Dataset processing consumer started');
   } catch (error) {
     logger.error(
       { error },
